@@ -73,9 +73,7 @@ class TemplatePlugin extends Plugin {
     return true;
   }
   function onEndShowExportData( &$act ) {
-    global $action;
-    if (in_array($action,array('public','showstream')))
-      $this->blocks['export'] = $act->xw->flush();
+    $this->blocks['export'] = $act->xw->flush();
   }
   
   // <%subscriptions%>
