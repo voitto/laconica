@@ -149,33 +149,51 @@ class TemplatePlugin extends Plugin {
   // <%header%>
   function onStartShowHeader( &$act ) {
     $this->clear_xmlWriter($act);
-    return true;
-  }
-  function onEndShowHeader( &$act ) {
-    $this->blocks['header'] = $act->xw->flush();
+    $act->showLogo();
+    $this->blocks['logo'] = $act->xw->flush();
+    $act->showPrimaryNav();
+    $this->blocks['nav'] = $act->xw->flush();
+    $act->showSiteNotice();
+    $this->blocks['notice'] = $act->xw->flush();
+    if (common_logged_in()) {
+        $act->showNoticeForm();
+    } else {
+        $act->showAnonymousMessage();
+    }
+    $this->blocks['noticeform'] = $act->xw->flush();
+    return false;
   }
   
   // <%footer%>
   function onStartShowFooter( &$act ) {
     $this->clear_xmlWriter($act);
-    return true;
-  }
-  function onEndShowFooter( &$act ) {
-    $this->blocks['footer'] = $act->xw->flush();
+    $act->showSecondaryNav();
+    $this->blocks['secondarynav'] = $act->xw->flush();
+    $act->showLicenses();
+    $this->blocks['licenses'] = $act->xw->flush();
+    return false;
   }
   
   function onEndEndHTML($act) {
     
-    global $user, $action, $config;
-    
-    $tpl_file = 'tpl/index.html';
-    
-    $output = file_get_contents( $tpl_file );
+    global $user, $action, $config, $tags;
     
     $vars = array(
       'action'=>$action,
       'title'=>$act->title(). " - ". common_config('site', 'name')
     );
+    
+    // use the PHP template by default
+    if (!(common_config('template', 'mode') == 'html')) {
+      $tpl_file = 'tpl/index.php';
+      $tags = array_merge($vars,$this->blocks);
+      include $tpl_file;
+      return;
+    }
+    
+    $tpl_file = 'tpl/index.html';
+    
+    $output = file_get_contents( $tpl_file );
     
     $tags = array();
     
@@ -257,5 +275,11 @@ class TemplateAction extends Action
       
     }
   }
+}
+
+function show($tagname) {
+  global $tags;
+  if (isset($tags[$tagname]))
+    echo $tags[$tagname];
 }
 
