@@ -277,9 +277,9 @@ class TemplateAction extends Action
   }
 }
 
-function show($tagname) {
+function section($tagname) {
   global $tags;
   if (isset($tags[$tagname]))
-    echo $tags[$tagname];
+    return $tags[$tagname];
 }
 
