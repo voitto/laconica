@@ -2,7 +2,10 @@
 /**
  * Plugin to render old skool templates
  *
- * Captures rendered parts in the output buffer, passes them through a template file: tpl/[act].html
+ * Captures rendered parts from the output buffer, passes them through a template file: tpl/index.html
+ * Adds an API method at index.php/template/update which lets you overwrite the template file
+ * Requires username/password and a single POST parameter called "template"
+ * The method is disabled unless the user is #1, the first user of the system
  *
  * @category  Plugin
  * @package   Laconica
@@ -24,6 +27,12 @@ class TemplatePlugin extends Plugin {
   
   function __construct() {
     parent::__construct();
+  }
+  
+  function onRouterInitialized( &$m ) {
+    $m->connect( 'template/update', array(
+      'action'      => 'template',
+    ));
   }
   
   // <%styles%>
@@ -202,3 +211,51 @@ class TemplatePlugin extends Plugin {
   }
   
 }
+
+class TemplateAction extends Action
+{
+
+  function prepare($args) {
+    parent::prepare($args);
+    return true;
+  }
+  
+  function handle($args) {
+    
+    parent::handle($args);
+    
+    if (!isset($_SERVER['PHP_AUTH_USER'])) {
+      
+      header('WWW-Authenticate: Basic realm="Laconica API"');
+      trigger_error('authentication error', E_USER_ERROR);
+      
+    } else {
+      
+      $nick = $_SERVER['PHP_AUTH_USER'];
+      $pass = $_SERVER['PHP_AUTH_PW'];
+      
+      $user = common_check_user($nick,$pass);
+      
+      if ($user) {
+        
+        if (!($user->id == 1))
+          trigger_error( 'only User #1 can update the template', E_USER_ERROR );
+        
+        $tpl_file = 'tpl/index.html';
+        $fp = fopen( $tpl_file, 'w+' );
+        
+        fwrite($fp, $this->arg('template'));
+        fclose($fp);
+        
+        header('HTTP/1.1 200 OK');
+        header('Content-type: text/plain');
+        print "OK";
+        
+      } else {
+        trigger_error('authentication error', E_USER_ERROR);
+      }
+      
+    }
+  }
+}
+
