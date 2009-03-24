@@ -29,11 +29,15 @@ class TemplatePlugin extends Plugin {
     parent::__construct();
   }
   
+  // capture the RouterInitialized event
+  // and connect a new API method
+  // for updating the template
   function onRouterInitialized( &$m ) {
     $m->connect( 'template/update', array(
       'action'      => 'template',
     ));
   }
+  
   
   // <%styles%>
   // <%scripts%>
@@ -146,7 +150,10 @@ class TemplatePlugin extends Plugin {
     return false;
   }
   
-  // <%header%>
+  // <%logo%>
+  // <%nav%>
+  // <%notice%>
+  // <%noticeform%>
   function onStartShowHeader( &$act ) {
     $this->clear_xmlWriter($act);
     $act->showLogo();
@@ -164,7 +171,8 @@ class TemplatePlugin extends Plugin {
     return false;
   }
   
-  // <%footer%>
+  // <%secondarynav%>
+  // <%licenses%>
   function onStartShowFooter( &$act ) {
     $this->clear_xmlWriter($act);
     $act->showSecondaryNav();
@@ -174,16 +182,21 @@ class TemplatePlugin extends Plugin {
     return false;
   }
   
+  // capture the EndHTML event
+  // and include the template
   function onEndEndHTML($act) {
     
-    global $user, $action, $config, $tags;
+    global $action, $tags;
     
+    // set the action and title values
     $vars = array(
       'action'=>$action,
       'title'=>$act->title(). " - ". common_config('site', 'name')
     );
     
-    // use the PHP template by default
+    // use the PHP template
+    // unless laconica config:
+    //   $config['template']['mode'] = 'html';
     if (!(common_config('template', 'mode') == 'html')) {
       $tpl_file = 'tpl/index.php';
       $tags = array_merge($vars,$this->blocks);
@@ -193,22 +206,28 @@ class TemplatePlugin extends Plugin {
     
     $tpl_file = 'tpl/index.html';
     
+    // read the static template
     $output = file_get_contents( $tpl_file );
     
     $tags = array();
     
+    // get a list of the <%tags%> in the template
     $pattern='/<%([a-z]+)%>/';
     
     if ( 1 <= preg_match_all( $pattern, $output, $found ))
       $tags[] = $found;
     
+    // for each found tag, set its value from the rendered blocks
     foreach( $tags[0][1] as $pos=>$tag ) {
       if (isset($this->blocks[$tag]))
         $vars[$tag] = $this->blocks[$tag];
+        
+      // didn't find a block for the tag
       elseif (!isset($vars[$tag]))
         $vars[$tag] = '';
     }
     
+    // replace the tags in the template
     foreach( $vars as $key=>$val )
       $output = str_replace( '<%'.$key.'%>', $val, $output );
     
@@ -218,11 +237,13 @@ class TemplatePlugin extends Plugin {
     
   }
   
+  // catching the StartShowHTML event to halt the rendering
   function onStartShowHTML( &$act ) {
     $this->clear_xmlWriter($act);
     return true;
   }
   
+  // clear the xmlWriter
   function clear_xmlWriter( &$act ) {
     $act->xw->openMemory();
     $act->xw->setIndent(true);
@@ -230,6 +251,20 @@ class TemplatePlugin extends Plugin {
   
 }
 
+/**
+ * Action for updating the template remotely
+ *
+ * "template/update" -- a POST method that requires a single
+ * parameter "template", containing the new template code
+ *
+ * @category Plugin
+ * @package  Laconica
+ * @author   Brian Hendrickson <brian@megapump.com>
+ * @license  http://www.fsf.org/licensing/licenses/agpl-3.0.html GNU Affero General Public License version 3.0
+ * @link     http://megapump.com/
+ *
+ */
+ 
 class TemplateAction extends Action
 {
 
@@ -244,38 +279,62 @@ class TemplateAction extends Action
     
     if (!isset($_SERVER['PHP_AUTH_USER'])) {
       
+      // not authenticated, show login form
       header('WWW-Authenticate: Basic realm="Laconica API"');
-      trigger_error('authentication error', E_USER_ERROR);
+      
+      // cancelled the browser login form
+      $this->clientError(_('Authentication error!'), $code = 401);
       
     } else {
       
       $nick = $_SERVER['PHP_AUTH_USER'];
       $pass = $_SERVER['PHP_AUTH_PW'];
       
+      // check username and password
       $user = common_check_user($nick,$pass);
       
       if ($user) {
         
+        // verify that user is admin
         if (!($user->id == 1))
-          trigger_error( 'only User #1 can update the template', E_USER_ERROR );
+          $this->clientError(_('only User #1 can update the template'), $code = 401);
         
+        // open the old template
         $tpl_file = 'tpl/index.html';
         $fp = fopen( $tpl_file, 'w+' );
         
+        // overwrite with the new template
         fwrite($fp, $this->arg('template'));
         fclose($fp);
         
         header('HTTP/1.1 200 OK');
         header('Content-type: text/plain');
-        print "OK";
+        print "Template Updated!";
         
       } else {
-        trigger_error('authentication error', E_USER_ERROR);
+        
+        // bad username and password
+        $this->clientError(_('Authentication error!'), $code = 401);
+        
       }
       
     }
   }
 }
+
+/**
+ * Function for retrieving a laconica display section
+ *
+ * requires one parameter, the name of the section
+ * section names are listed in the comments of the TemplatePlugin class
+ *
+ * @category Plugin
+ * @package  Laconica
+ * @author   Brian Hendrickson <brian@megapump.com>
+ * @license  http://www.fsf.org/licensing/licenses/agpl-3.0.html GNU Affero General Public License version 3.0
+ * @link     http://megapump.com/
+ *
+ */
 
 function section($tagname) {
   global $tags;

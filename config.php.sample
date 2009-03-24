@@ -166,6 +166,7 @@ $config['sphinx']['port'] = 3312;
 # Use Templating (templates in /tpl)
 # require_once('plugins/TemplatePlugin.php');
 # $tpl = new TemplatePlugin();
+# $config['template']['mode'] = 'html'; // (OPTIONAL)
 
 #Don't allow saying the same thing more than once per hour
 #$config['site']['dupelimit'] = 3600;
